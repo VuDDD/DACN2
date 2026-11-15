@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments
+.env
+.venv
+venv/
+ENV/
+
+# Large Archives & Raw Downloads
+*.zip
+*.tar.gz
+*.rar
+img/
+data/IDRiD/
+data/DRIVE/
+!data/*.csv
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# Database & Storage
+*.sqlite3
+*.db
+backend_storage/
+minio_data/
+postgres_data/
+redis_data/
+
+# Model Checkpoints (track directory with .gitkeep)
+ai/checkpoints/*.pth
+ai/checkpoints/*.pt
+!ai/checkpoints/.gitkeep
+
+# Reports & Generated files
+reports/generated/*.pdf
+!reports/generated/.gitkeep
+
+# IDEs & System
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

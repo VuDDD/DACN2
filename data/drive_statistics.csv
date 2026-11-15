@@ -1,0 +1,41 @@
+image_id,split,vessel_pixels,fov_pixels,vessel_density_pct
+21,train,19531,179226,10.897
+22,train,23674,180871,13.089
+23,train,17237,181289,9.508
+24,train,30138,180934,16.657
+25,train,25261,180644,13.984
+26,train,22052,178807,12.333
+27,train,23012,181014,12.713
+28,train,25634,180630,14.191
+29,train,22001,180600,12.182
+30,train,20598,180565,11.408
+31,train,15799,180915,8.733
+32,train,21548,178723,12.057
+33,train,21167,180922,11.7
+34,train,25625,180007,14.236
+35,train,22778,180885,12.593
+36,train,28526,180534,15.801
+37,train,22890,180523,12.68
+38,train,22625,179735,12.588
+39,train,22583,180703,12.497
+40,train,19915,180307,11.045
+01,test,N/A (Benchmark Hidden),178278,N/A
+02,test,N/A (Benchmark Hidden),178804,N/A
+03,test,N/A (Benchmark Hidden),179299,N/A
+04,test,N/A (Benchmark Hidden),180831,N/A
+05,test,N/A (Benchmark Hidden),180896,N/A
+06,test,N/A (Benchmark Hidden),180754,N/A
+07,test,N/A (Benchmark Hidden),180891,N/A
+08,test,N/A (Benchmark Hidden),178948,N/A
+09,test,N/A (Benchmark Hidden),180863,N/A
+10,test,N/A (Benchmark Hidden),180606,N/A
+11,test,N/A (Benchmark Hidden),181001,N/A
+12,test,N/A (Benchmark Hidden),180818,N/A
+13,test,N/A (Benchmark Hidden),180735,N/A
+14,test,N/A (Benchmark Hidden),179453,N/A
+15,test,N/A (Benchmark Hidden),180668,N/A
+16,test,N/A (Benchmark Hidden),180896,N/A
+17,test,N/A (Benchmark Hidden),179456,N/A
+18,test,N/A (Benchmark Hidden),180834,N/A
+19,test,N/A (Benchmark Hidden),180636,N/A
+20,test,N/A (Benchmark Hidden),180751,N/A

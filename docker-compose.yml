@@ -1,0 +1,129 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: retina_postgres
+    environment:
+      POSTGRES_USER: retina_user
+      POSTGRES_PASSWORD: retina_pass
+      POSTGRES_DB: retina_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retina_user -d retina_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: retina_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: retina_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: retina_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://retina_user:retina_pass@postgres:5432/retina_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET_NAME=retina-medical
+      - STORAGE_DIR=/app/backend_storage
+      - DEVICE=cpu
+    volumes:
+      - backend_storage:/app/backend_storage
+      - ./ai/checkpoints:/app/ai/checkpoints
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: retina_ai_worker
+    command: ["celery", "-A", "app.workers.celery_app.celery_app", "worker", "--loglevel=info", "-c", "1"]
+    environment:
+      - DATABASE_URL=postgresql://retina_user:retina_pass@postgres:5432/retina_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET_NAME=retina-medical
+      - STORAGE_DIR=/app/backend_storage
+      - DEVICE=cpu
+    volumes:
+      - backend_storage:/app/backend_storage
+      - ./ai/checkpoints:/app/ai/checkpoints
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: retina_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  backend_storage:
