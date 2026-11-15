@@ -49,3 +49,4 @@ Nhằm nâng cao độ chính xác và khả năng ứng dụng thực tế tron
    - Áp dụng các kỹ thuật lượng tử hóa (Quantization INT8), cắt tỉa mạng (Pruning) và chưng cất tri thức (Knowledge Distillation) để nhúng mô hình vào các thiết bị chụp đáy mắt cầm tay gắn liền với smartphone, hỗ trợ các đội ngũ y tế lưu động tại vùng sâu vùng xa.
 5. **Hợp tác Thử nghiệm Lâm sàng:**
    - Phối hợp với các bệnh viện mắt và trung tâm nội tiết đái tháo đường để tiến hành kiểm nghiệm mù đôi (Blind Trial), so sánh độ chính xác giữa kết quả hệ thống AI và đánh giá của hội đồng bác sĩ nhãn khoa chuyên khoa II.
+

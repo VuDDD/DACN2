@@ -18,3 +18,4 @@ class Patient(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     analyses = relationship("Analysis", back_populates="patient", cascade="all, delete-orphan")
+

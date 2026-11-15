@@ -111,3 +111,4 @@ def login_json(
 def read_current_user(current_user: User = Depends(get_current_user)) -> Any:
     """Get profile of current authenticated user."""
     return current_user
+

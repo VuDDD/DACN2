@@ -131,3 +131,4 @@ def delete_patient(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
     db.delete(patient)
     db.commit()
+

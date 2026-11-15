@@ -21,3 +21,4 @@ def celery_run_analysis(self, analysis_id: int):
         raise self.retry(exc=exc, countdown=5)
     finally:
         db.close()
+

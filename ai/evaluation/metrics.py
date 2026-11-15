@@ -110,3 +110,4 @@ def calculate_metrics_multiclass(
         },
         "per_class": per_class
     }
+

@@ -81,3 +81,4 @@ class Report(Base):
     generated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     analysis = relationship("Analysis", back_populates="reports")
+

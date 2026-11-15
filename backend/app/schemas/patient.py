@@ -40,3 +40,4 @@ class PatientOut(PatientBase):
 class PatientListResponse(BaseModel):
     items: List[PatientOut]
     total: int
+

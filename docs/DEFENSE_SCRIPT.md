@@ -88,3 +88,4 @@
 > *Chúng em xin gửi lời cảm ơn chân thành và sâu sắc nhất đến các Thầy Cô trong Khoa Khoa học Máy tính và Hội đồng đã tận tình hướng dẫn, theo dõi và đóng góp ý kiến cho đề tài.*
 > 
 > *Em xin kết thúc bài báo cáo và kính mời quý Thầy Cô trong Hội đồng đặt câu hỏi phản biện ạ. Em xin trân trọng cảm ơn!"*
+

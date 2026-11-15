@@ -225,3 +225,4 @@ tests/test_evaluator.py::test_render_color_mask_overlay PASSED           [100%]
 ## 8. CẢNH BÁO Y ĐỨC VÀ PHÁP LÝ (MEDICAL DISCLAIMER)
 
 Hệ thống phần mềm được thiết kế và phát triển với tư cách là một **Nền tảng hỗ trợ nghiên cứu khoa học và trợ giúp quyết định lâm sàng (Clinical Decision Support System - CDSS)**. Các đường biên phân vùng, số lượng ổ tổn thương và tỷ lệ phần trăm diện tích do mô hình Deep Learning tính toán không thay thế cho chẩn đoán xác định của bác sĩ chuyên khoa mắt có chứng chỉ hành nghề y khoa.
+

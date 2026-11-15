@@ -50,3 +50,4 @@ def test_render_color_mask_overlay():
     assert overlay.dtype == np.uint8
     # Center pixel should have higher red channel due to blending
     assert overlay[30, 30, 0] > overlay[10, 10, 0]
+

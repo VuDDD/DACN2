@@ -45,3 +45,4 @@
 ## 3. KẾT LUẬN KIỂM THỬ
 
 Toàn bộ 14 ca kiểm thử thành phần chuyên sâu và các bài kiểm tra tích hợp đều đã được thực thi và xác minh kết quả trực tiếp trên hệ thống mã nguồn thực tế. Không có bất kỳ kết quả kiểm thử nào được đánh dấu giả định.
+

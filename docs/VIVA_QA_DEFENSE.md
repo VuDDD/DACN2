@@ -78,3 +78,4 @@
   1. Chỉ số diện tích hiển thị rõ đơn vị pixel và tỷ lệ \% FOV, không tự ý quy đổi ra $\text{mm}^2$ khi chưa có hiệu chuẩn quang học thiết bị.
   2. Bắt buộc có chữ ký xác nhận của Bác sĩ nhãn khoa phụ trách (Consulting Physician Signature).
   3. Luôn có điều khoản cảnh báo y đức pháp lý (Legal Medical Disclaimer) in rõ ở chân trang, khẳng định kết quả AI mang tính chất tham khảo nghiên cứu và hỗ trợ chẩn đoán hình ảnh.
+

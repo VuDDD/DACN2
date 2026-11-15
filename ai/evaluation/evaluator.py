@@ -167,3 +167,4 @@ def render_color_mask_overlay(
             overlay[mask] = (1.0 - alpha) * overlay[mask] + alpha * color
 
     return np.clip(overlay, 0, 255).astype(np.uint8)
+

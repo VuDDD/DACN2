@@ -117,3 +117,4 @@ Giao diện hệ thống được lập trình hoàn chỉnh với tông màu tr
      - Tương tác vật lý: Thu phóng mượt mà từ 10% đến 1000% centered tại con trỏ chuột, kéo rê di chuyển (Pan), hiển thị tọa độ điểm ảnh chính xác theo thời gian thực.
 4. **Bảng Kết quả Định lượng Lâm sàng:** Báo cáo chi tiết số lượng ổ tổn thương liên thông (Foci Count) qua giải thuật Connected Components, diện tích pixel và tỷ lệ phần trăm trên trường thị giác võng mạc hợp lệ (FOV %).
 5. **Phiếu Kết quả Xét nghiệm PDF (Medical Report):** Xuất bản tự động bằng thư viện **ReportLab** chuẩn khổ giấy A4, bao gồm logo nhận diện VKU, bảng thông tin hành chính bệnh nhân, ảnh võng mạc gốc và ảnh mặt nạ phân vùng song song, bảng thống kê diện tích tổn thương và cảnh báo y đức pháp lý.
+

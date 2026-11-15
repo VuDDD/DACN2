@@ -180,3 +180,4 @@ class RetinalPredictor:
             "metrics": metrics_dict,
             "processing_time_ms": elapsed_ms
         }
+

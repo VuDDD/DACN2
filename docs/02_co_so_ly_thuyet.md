@@ -150,3 +150,4 @@ Quy tắc kỹ thuật: Chỉ số được hiển thị minh bạch bằng đơ
 5. **Frontend:** **React 18 + Vite + TypeScript + Tailwind CSS**, tích hợp **HTML5 Canvas API** xây dựng bộ quan sát ảnh đáy mắt y khoa đa lớp mượt mà, **Recharts** vẽ biểu đồ thống kê.
 6. **Báo cáo:** **ReportLab 4.1**, sinh phiếu kết quả xét nghiệm y khoa dạng PDF chuẩn quốc tế.
 7. **Đóng gói:** **Docker & Docker Compose**, hỗ trợ cấu hình đa dịch vụ với chế độ CPU và GPU CUDA.
+

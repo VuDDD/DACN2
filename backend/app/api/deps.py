@@ -47,3 +47,4 @@ def get_current_admin(
             detail="Operation requires administrator privileges"
         )
     return current_user
+

@@ -159,3 +159,4 @@
 ## SLIDE 15: Acknowledgments & Q&A
 - **Sincere Gratitude:** To faculty advisors, Department of Computer Science & AI, and Vietnam - Korea University of Information and Communication Technology (VKU).
 - **Open for Questions:** Welcoming inquiries from the Academic Examination Committee!
+

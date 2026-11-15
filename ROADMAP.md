@@ -114,3 +114,4 @@ Dự án hướng đến việc xây dựng một hệ thống y tế hỗ trợ
 | **Tách biệt nhiệm vụ** | IDRiD giải quyết tổn thương và đĩa thị (5 nhãn). DRIVE giải quyết cây mạch máu trong FOV mask. Không trộn lẫn hai bài toán. |
 | **Độ tin cậy định lượng** | Chỉ số diện tích hiển thị rõ đơn vị pixel và phần trăm trên FOV. Chỉ quy đổi ra mm² khi có hiệu chuẩn quang học thiết bị chụp đáy mắt. |
 | **Khả năng chạy độc lập** | Hệ thống hỗ trợ chế độ CPU lẫn GPU RTX 4050, có thể khởi chạy bằng cả Docker Compose lẫn chạy trực tiếp bằng Python/Vite. |
+

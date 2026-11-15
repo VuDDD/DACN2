@@ -20,3 +20,4 @@ class PurePythonCythonFinder:
 # Register at highest priority in sys.meta_path if not already registered
 if not any(isinstance(finder, PurePythonCythonFinder) for finder in sys.meta_path):
     sys.meta_path.insert(0, PurePythonCythonFinder())
+

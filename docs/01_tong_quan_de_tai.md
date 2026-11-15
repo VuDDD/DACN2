@@ -65,3 +65,4 @@ Do đó, việc nghiên cứu và xây dựng một **Nền tảng phân vùng v
 - **Dữ liệu thực nghiệm:** Giới hạn trên hai bộ dữ liệu tiêu chuẩn quốc tế đã được thẩm định chuyên gia: Indian Diabetic Retinopathy Image Dataset (**IDRiD**) và Digital Retinal Images for Vessel Extraction (**DRIVE**).
 - **Phạm vi kỹ thuật:** Xây dựng hệ sinh thái phần mềm nguyên mẫu hoàn chỉnh (Working Prototype) có khả năng triển khai thực tế trên máy tính cá nhân hoặc máy chủ bệnh viện nội bộ.
 - **Tuyên bố y đức và giới hạn:** Hệ thống được thiết kế như một công cụ hỗ trợ quyết định lâm sàng (Clinical Decision Support System - CDSS) và nghiên cứu khoa học; kết quả phân tích không thay thế chẩn đoán sau cùng của bác sĩ chuyên khoa mắt có chứng chỉ hành nghề.
+

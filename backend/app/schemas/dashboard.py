@@ -26,3 +26,4 @@ class ModelPerformanceStat(BaseModel):
     mean_precision: float
     mean_recall: float
     sample_count: int
+

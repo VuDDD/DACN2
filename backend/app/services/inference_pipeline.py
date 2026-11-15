@@ -103,3 +103,4 @@ def process_retinal_analysis(analysis_id: int, db: Session) -> Analysis:
         analysis.error_message = str(e)
         db.commit()
         raise
+

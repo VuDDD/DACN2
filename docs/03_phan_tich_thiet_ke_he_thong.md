@@ -295,3 +295,4 @@ Hệ thống cung cấp giao diện lập trình ứng dụng RESTful API chuẩ
 | `GET` | `/api/dashboard/statistics` | Doctor/Admin | Thống kê số lượng bệnh nhân, ca chụp, tỷ lệ hoàn thành |
 | `GET` | `/api/dashboard/lesion-distribution` | Doctor/Admin | Thống kê phân bố số lượng và diện tích theo 6 nhãn |
 | `GET` | `/api/dashboard/model-performance` | Doctor/Admin | Đánh giá hiệu năng thực nghiệm U-Net vs Attention U-Net |
+

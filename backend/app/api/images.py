@@ -144,3 +144,4 @@ def load_sample_into_storage(
         "height": h,
         "task_type": task_type
     }
+

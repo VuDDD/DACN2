@@ -109,3 +109,4 @@ def download_report(
         filename=f"{report.report_code}.pdf",
         headers={"Content-Disposition": f"attachment; filename={report.report_code}.pdf"}
     )
+

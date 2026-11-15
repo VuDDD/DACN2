@@ -52,3 +52,4 @@ WEIGHT_DECAY = 1e-5
 NUM_EPOCHS = 20
 EARLY_STOPPING_PATIENCE = 7
 NUM_WORKERS = 0 # 0 for Windows multiprocessing safety
+

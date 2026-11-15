@@ -64,3 +64,4 @@ class RetinalAugmentor:
         # Clip image to valid pixel range [0, 1]
         image = np.clip(image, 0.0, 1.0)
         return image, masks
+

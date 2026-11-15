@@ -331,3 +331,4 @@ def generate_medical_pdf_report(
     # Build Document
     doc.build(story)
     return output_pdf_path
+
