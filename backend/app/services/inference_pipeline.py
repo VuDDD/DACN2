@@ -66,21 +66,21 @@ def process_retinal_analysis(analysis_id: int, db: Session) -> Analysis:
 
         # Update quantification findings
         quant = res["quantification"]
-        analysis.retinal_fov_pixels = quant["retinal_fov_pixels"]
-        analysis.lesion_area_pixels = quant["total_lesion_pixels"]
-        analysis.lesion_percentage = quant["total_lesion_percentage"]
-        analysis.processing_time_ms = res["processing_time_ms"]
+        analysis.retinal_fov_pixels = int(quant["retinal_fov_pixels"])
+        analysis.lesion_area_pixels = int(quant["total_lesion_pixels"])
+        analysis.lesion_percentage = float(quant["total_lesion_percentage"])
+        analysis.processing_time_ms = int(res["processing_time_ms"])
         analysis.predicted_mask_url = rel_overlay_url
 
         # Record validation metrics if ground truth was present
         if res["metrics"]:
             m = res["metrics"]
-            analysis.dice_score = m.get("dice")
-            analysis.iou_score = m.get("iou")
-            analysis.precision = m.get("precision")
-            analysis.recall = m.get("recall")
-            analysis.specificity = m.get("specificity")
-            analysis.f1_score = m.get("f1")
+            analysis.dice_score = float(m["dice"]) if m.get("dice") is not None else None
+            analysis.iou_score = float(m["iou"]) if m.get("iou") is not None else None
+            analysis.precision = float(m["precision"]) if m.get("precision") is not None else None
+            analysis.recall = float(m["recall"]) if m.get("recall") is not None else None
+            analysis.specificity = float(m["specificity"]) if m.get("specificity") is not None else None
+            analysis.f1_score = float(m["f1"]) if m.get("f1") is not None else None
 
         # Clear existing lesion details if re-analyzing
         db.query(LesionDetail).filter(LesionDetail.analysis_id == analysis.id).delete()
@@ -90,9 +90,9 @@ def process_retinal_analysis(analysis_id: int, db: Session) -> Analysis:
             detail = LesionDetail(
                 analysis_id=analysis.id,
                 lesion_type=item["lesion_type"],
-                count=item["count"],
-                area_pixels=item["area_pixels"],
-                area_percentage=item["area_percentage"]
+                count=int(item["count"]),
+                area_pixels=int(item["area_pixels"]),
+                area_percentage=float(item["area_percentage"])
             )
             db.add(detail)
 

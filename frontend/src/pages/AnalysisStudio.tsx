@@ -167,9 +167,11 @@ export const AnalysisStudio: React.FC = () => {
   };
 
   const pollAnalysisStatus = (id: number) => {
+    let consecutiveFailures = 0;
     const interval = setInterval(async () => {
       try {
         const res = await api.get(`/analysis/${id}/status`);
+        consecutiveFailures = 0;
         setStatus(res.data.status);
         setProgress(res.data.progress || 50);
 
@@ -183,10 +185,16 @@ export const AnalysisStudio: React.FC = () => {
             setErrorMessage(res.data.message || 'Phân tích thất bại.');
           }
         }
-      } catch (err) {
-        clearInterval(interval);
-        setStatus('FAILED');
-        setErrorMessage('Lỗi kết nối kiểm tra tiến trình phân tích.');
+      } catch (err: any) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 4) {
+          clearInterval(interval);
+          setStatus('FAILED');
+          setErrorMessage(
+            err.response?.data?.detail ||
+            'Không thể kết nối đến Backend để kiểm tra tiến trình. Hãy đảm bảo Server Backend đang chạy tại http://127.0.0.1:8000'
+          );
+        }
       }
     }, 1500);
   };
