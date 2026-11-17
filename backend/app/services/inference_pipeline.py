@@ -1,9 +1,15 @@
+import sys
 import os
 import io
 import time
 import logging
 from PIL import Image
 from sqlalchemy.orm import Session
+
+# Ensure project root is in sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from app.models.analysis import Analysis, LesionDetail, AnalysisStatus, TaskType
 from app.storage.service import storage_service
