@@ -242,22 +242,37 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-    const newScale = Math.max(0.1, Math.min(scale * zoomFactor, 10));
+  // Keep refs updated for non-passive wheel listener
+  const scaleRef = useRef(scale);
+  const offsetRef = useRef(offset);
+  scaleRef.current = scale;
+  offsetRef.current = offset;
 
-    // Zoom centered at cursor
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const currentScale = scaleRef.current;
+      const currentOffset = offsetRef.current;
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+      const newScale = Math.max(0.1, Math.min(currentScale * zoomFactor, 10));
+
+      const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      const newX = mouseX - (mouseX - offset.x) * (newScale / scale);
-      const newY = mouseY - (mouseY - offset.y) * (newScale / scale);
+      const newX = mouseX - (mouseX - currentOffset.x) * (newScale / currentScale);
+      const newY = mouseY - (mouseY - currentOffset.y) * (newScale / currentScale);
       setScale(newScale);
       setOffset({ x: newX, y: newY });
-    }
-  };
+    };
+
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+    };
+  }, []);
 
   const toggleClass = (key: string) => {
     setClasses((prev) =>
@@ -390,7 +405,6 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
           className="absolute inset-0 block w-full h-full"
         />
 
