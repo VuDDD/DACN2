@@ -1,0 +1,9 @@
+venv/
+venv*/
+__pycache__/
+*.pyc
+.env
+ai_core/data/
+ai_core/weights/*.pth
+ai_core/weights/*.pt
+node_modules/
