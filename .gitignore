@@ -69,3 +69,6 @@ reports/generated/*.pdf
 *.swo
 .DS_Store
 Thumbs.db
+venv*/  
+*.pth  
+ai_core/data/  
