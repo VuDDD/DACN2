@@ -41,6 +41,7 @@ class RetinalPredictor:
             self.n_classes = len(IDRID_CLASSES)
             self.prefix = "idrid"
 
+        self.loaded_checkpoint_path: Optional[str] = None
         self.model = self._load_model()
 
     def _load_model(self) -> torch.nn.Module:
@@ -56,29 +57,29 @@ class RetinalPredictor:
         model = model.to(self.device)
         model.eval()
 
-        # Check for best checkpoint
-        ckpt_name = f"{self.prefix}_{tag}_best_model.pth"
-        ckpt_path = os.path.join(self.checkpoint_dir, ckpt_name)
+        # Prioritize designated production checkpoint weights
+        candidates = [
+            os.path.join(self.checkpoint_dir, f"{self.prefix}_{tag}_best.pth"),
+            os.path.join(self.checkpoint_dir, f"{self.prefix}_{tag}_best_model.pth"),
+            os.path.join(self.checkpoint_dir, f"{self.prefix}_best.pth"),
+            os.path.join(self.checkpoint_dir, f"{self.prefix}_best_model.pth"),
+            os.path.join(self.checkpoint_dir, "best_model.pth"),
+        ]
 
-        if os.path.exists(ckpt_path):
-            try:
-                ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=False)
-                state_dict = ckpt.get("model_state_dict", ckpt)
-                model.load_state_dict(state_dict)
-                print(f"[RetinalPredictor] Successfully loaded checkpoint weights from {ckpt_path}")
-            except Exception as e:
-                print(f"[RetinalPredictor] Warning: Error loading checkpoint ({e}). Running baseline initialization.")
-        else:
-            # Check generic best_model.pth
-            gen_path = os.path.join(self.checkpoint_dir, "best_model.pth")
-            if os.path.exists(gen_path):
+        for ckpt_path in candidates:
+            if os.path.exists(ckpt_path):
                 try:
-                    ckpt = torch.load(gen_path, map_location=self.device, weights_only=False)
+                    ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=False)
                     state_dict = ckpt.get("model_state_dict", ckpt)
                     model.load_state_dict(state_dict)
-                    print(f"[RetinalPredictor] Loaded default weights from {gen_path}")
-                except Exception:
-                    pass
+                    self.loaded_checkpoint_path = ckpt_path
+                    print(f"[RetinalPredictor] Successfully loaded checkpoint weights from {ckpt_path}")
+                    break
+                except Exception as e:
+                    print(f"[RetinalPredictor] Warning: Error loading {ckpt_path} ({e}). Trying next candidate...")
+
+        if not self.loaded_checkpoint_path:
+            print(f"[RetinalPredictor] Note: Running baseline initialization (no checkpoint found for {self.prefix}_{tag}).")
 
         return model
 
@@ -178,6 +179,7 @@ class RetinalPredictor:
             "fov_mask": fov_mask,
             "quantification": eval_result,
             "metrics": metrics_dict,
+            "loaded_checkpoint_path": self.loaded_checkpoint_path,
             "processing_time_ms": elapsed_ms
         }
 

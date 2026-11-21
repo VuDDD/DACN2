@@ -14,6 +14,7 @@ from ai.training.loss import BCEDiceLoss, DiceLoss
 from ai.evaluation.metrics import compute_binary_metrics, calculate_metrics_multiclass
 from ai.datasets.idrid_dataset import IDRiDDataset
 from ai.datasets.drive_dataset import DRIVEDataset
+from ai.inference.predict import RetinalPredictor
 
 def test_unet_architecture_forward():
     """Verify UNet forward pass with RGB input and 5-class IDRiD output."""
@@ -82,4 +83,17 @@ def test_drive_dataset_shapes():
     assert img.shape == (3, 256, 256)
     assert gt.shape == (1, 256, 256)
     assert fov.shape == (1, 256, 256)
+
+def test_retinal_predictor_loads_best_checkpoints():
+    """Verify RetinalPredictor automatically loads idrid_attention_unet_best.pth and drive_unet_best.pth."""
+    pred_att = RetinalPredictor(task_type="IDRID_LESIONS", model_name="Attention_UNet")
+    assert pred_att.model is not None
+    assert getattr(pred_att, "loaded_checkpoint_path", None) is not None, "Must track loaded_checkpoint_path"
+    assert "idrid_attention_unet_best" in pred_att.loaded_checkpoint_path.lower()
+
+    pred_drive = RetinalPredictor(task_type="DRIVE_VESSELS", model_name="UNet_Baseline")
+    assert pred_drive.model is not None
+    assert getattr(pred_drive, "loaded_checkpoint_path", None) is not None, "Must track loaded_checkpoint_path"
+    assert "drive_unet_best" in pred_drive.loaded_checkpoint_path.lower()
+
 

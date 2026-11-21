@@ -203,8 +203,9 @@ def generate_medical_pdf_report(
     lesion_headers = [
         Paragraph("Lesion / Structure", table_header_style),
         Paragraph("Foci Count", table_header_style),
-        Paragraph("Abnormal Area (px)", table_header_style),
-        Paragraph("Retinal FOV Ratio (%)", table_header_style),
+        Paragraph("Area (px)", table_header_style),
+        Paragraph("Area (mm²)", table_header_style),
+        Paragraph("FOV Ratio (%)", table_header_style),
         Paragraph("Clinical Significance", table_header_style),
     ]
 
@@ -218,14 +219,21 @@ def generate_medical_pdf_report(
         "VESSEL": ("Retinal Blood Vessels", "Full microvascular tree within valid Field of View (FOV)"),
     }
 
+    retinal_fov_px = getattr(analysis, "retinal_fov_pixels", 0) or 0
     details = getattr(analysis, "lesion_details", [])
     if details:
         for d in details:
             info = lesion_names_map.get(d.lesion_type, (d.lesion_type, "Abnormal retinal manifestation"))
+            if retinal_fov_px > 0:
+                area_mm2 = (d.area_pixels / retinal_fov_px) * 1090.0
+            else:
+                area_mm2 = (d.area_percentage / 100.0) * 1090.0
+
             row = [
                 Paragraph(f"<b>{info[0]}</b>", table_cell_style),
                 Paragraph(str(d.count), table_cell_style),
                 Paragraph(f"{d.area_pixels:,} px", table_cell_style),
+                Paragraph(f"{area_mm2:.3f} mm²", table_cell_style),
                 Paragraph(f"{d.area_percentage:.3f} %", table_cell_style),
                 Paragraph(f"<font size='7.5'>{info[1]}</font>", table_cell_style),
             ]
@@ -234,15 +242,21 @@ def generate_medical_pdf_report(
         # Default row if no detailed breakdown is registered
         total_px = getattr(analysis, "lesion_area_pixels", 0) or 0
         total_pct = getattr(analysis, "lesion_percentage", 0.0) or 0.0
+        if retinal_fov_px > 0:
+            total_mm2 = (total_px / retinal_fov_px) * 1090.0
+        else:
+            total_mm2 = (total_pct / 100.0) * 1090.0
+
         lesion_rows.append([
             Paragraph("Total Abnormal Lesions", table_cell_style),
             Paragraph("Detected", table_cell_style),
             Paragraph(f"{total_px:,} px", table_cell_style),
+            Paragraph(f"{total_mm2:.3f} mm²", table_cell_style),
             Paragraph(f"{total_pct:.3f} %", table_cell_style),
             Paragraph("Aggregate pathological presentation", table_cell_style),
         ])
 
-    lesion_table = Table(lesion_rows, colWidths=[120, 60, 95, 95, 150])
+    lesion_table = Table(lesion_rows, colWidths=[110, 50, 75, 75, 70, 140])
     lesion_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), primary_color),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -255,9 +269,55 @@ def generate_medical_pdf_report(
     story.append(lesion_table)
     story.append(Spacer(1, 14))
 
-    # 5. Model Evaluation Metrics (if ground truth was provided)
+    # 5. Clinical NPDR Severity Staging Section
+    from ai.evaluation.evaluator import classify_npdr_severity
+    lesion_dicts = []
+    if details:
+        for d in details:
+            lesion_dicts.append({
+                "lesion_type": d.lesion_type,
+                "count": d.count,
+                "area_pixels": d.area_pixels,
+                "area_percentage": d.area_percentage
+            })
+    total_pct_val = float(getattr(analysis, "lesion_percentage", 0.0) or 0.0)
+    npdr_info = classify_npdr_severity(lesion_dicts, total_pct_val)
+
+    grade_colors = {
+        "No DR": colors.HexColor("#10b981"),      # Green
+        "Mild": colors.HexColor("#3b82f6"),       # Blue
+        "Moderate": colors.HexColor("#f59e0b"),   # Amber
+        "Severe": colors.HexColor("#ef4444"),     # Red
+    }
+    g_color = grade_colors.get(npdr_info["grade"], primary_color)
+
+    story.append(Paragraph("3. Clinical NPDR Severity Staging (ICDR Standard)", section_title_style))
+    npdr_table_data = [
+        [
+            Paragraph(f"<b>Clinical Diagnosis:</b> <font color='{g_color.hexval()}'><b>{npdr_info['grade'].upper()} NPDR</b></font>", body_style),
+            Paragraph(f"<b>ICDR Scale Level:</b> Level {npdr_info.get('icdr_level', 0)}", body_style),
+        ],
+        [
+            Paragraph(f"<b>Pathological Findings:</b> {npdr_info['description']}", body_style),
+            Paragraph(f"<b>Action / Recommendation:</b> {npdr_info['recommendation']}", body_style),
+        ]
+    ]
+    npdr_table = Table(npdr_table_data, colWidths=[260, 260])
+    npdr_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), gray_bg),
+        ('BOX', (0,0), (-1,-1), 1, g_color),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, border_color),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING', (0,0), (-1,-1), 8),
+        ('RIGHTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(npdr_table)
+    story.append(Spacer(1, 14))
+
+    # 6. Model Evaluation Metrics (if ground truth was provided)
     if analysis.dice_score is not None:
-        story.append(Paragraph("3. Model Validation Metrics (Evaluated vs Ground Truth)", section_title_style))
+        story.append(Paragraph("4. Model Validation Metrics (Evaluated vs Ground Truth)", section_title_style))
         metric_headers = [
             Paragraph("Dice Score", table_header_style),
             Paragraph("IoU (Jaccard)", table_header_style),
@@ -285,9 +345,9 @@ def generate_medical_pdf_report(
         story.append(metric_table)
         story.append(Spacer(1, 14))
 
-    # 6. Physician Notes & Signature
+    # 7. Physician Notes & Signature
     notes_content = doctor_notes or getattr(analysis, "error_message", None) or "Automated screening performed. Lesion boundaries identified and quantified."
-    story.append(Paragraph("4. Physician Observations & Clinical Notes", section_title_style))
+    story.append(Paragraph("5. Physician Observations & Clinical Notes", section_title_style))
     notes_p = Paragraph(f"<i>{notes_content}</i>", body_style)
     notes_table = Table([[notes_p]], colWidths=[520])
     notes_table.setStyle(TableStyle([

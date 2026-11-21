@@ -110,6 +110,12 @@ def test_dashboard_statistics_and_distributions(db_session, admin_user):
     
     perf = get_model_performance(db=db_session, current_user=admin_user)
     assert len(perf) == 2 # UNet_Baseline, Attention_UNet
+    for p in perf:
+        assert p["mean_dice"] > 0.0, f"Expected non-zero mean_dice for {p['model_name']}"
+        assert p["mean_iou"] > 0.0, f"Expected non-zero mean_iou for {p['model_name']}"
+        assert p["mean_precision"] > 0.0, f"Expected non-zero mean_precision for {p['model_name']}"
+        assert p["mean_recall"] > 0.0, f"Expected non-zero mean_recall for {p['model_name']}"
+        assert p["sample_count"] > 0, f"Expected sample_count > 0 for {p['model_name']}"
 
 def test_report_generation(db_session, admin_user):
     """Verify PDF report generation for an analysis record."""
