@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 
 from ai.config import (
     DEVICE, IMAGE_SIZE, IDRID_CLASSES, DRIVE_CLASSES,
@@ -18,13 +18,15 @@ from ai.config import (
 )
 from ai.models.unet import UNet
 from ai.models.attention_unet import AttentionUNet
-from ai.training.loss import BCEDiceLoss
+from ai.training.loss import BCEDiceLoss, ComboFocalDiceLoss
 from ai.training.augmentations import RetinalAugmentor
 from ai.evaluation.metrics import calculate_metrics_multiclass, compute_binary_metrics
 
-def train_one_epoch(model, loader, optimizer, criterion, device, augmentor=None, is_drive=False):
+
+def train_one_epoch(model, loader, optimizer, scaler, criterion, device, augmentor=None, is_drive=False):
     model.train()
     running_loss = 0.0
+    use_amp = (device.type == "cuda")
 
     for batch in loader:
         if is_drive:
@@ -45,15 +47,14 @@ def train_one_epoch(model, loader, optimizer, criterion, device, augmentor=None,
         targets = targets.to(device)
 
         optimizer.zero_grad()
-        
-        # Mixed Precision when CUDA is active
-        use_amp = (device.type == "cuda")
+
         with torch.amp.autocast(device_type="cuda", enabled=use_amp):
             logits = model(images)
             loss = criterion(logits, targets)
 
-        loss.backward()
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         running_loss += loss.item() * images.size(0)
 
@@ -86,17 +87,15 @@ def validate_epoch(model, loader, criterion, device, class_names, is_drive=False
         all_targets.append(targets.cpu())
 
     epoch_loss = running_loss / len(loader.dataset)
-    
+
     cat_preds = torch.cat(all_preds, dim=0).numpy()
     cat_targets = torch.cat(all_targets, dim=0).numpy()
 
     if is_drive:
-        # Binary vessel evaluation
         metrics = compute_binary_metrics(cat_preds[:, 0, :, :].flatten(), cat_targets[:, 0, :, :].flatten())
         val_dice = metrics["dice"]
         val_iou = metrics["iou"]
     else:
-        # Multi-class evaluation across 5 IDRiD lesions
         res = calculate_metrics_multiclass(cat_preds, cat_targets, class_names=class_names)
         val_dice = res["macro_avg"]["dice"]
         val_iou = res["macro_avg"]["iou"]
@@ -104,7 +103,7 @@ def validate_epoch(model, loader, criterion, device, class_names, is_drive=False
     return epoch_loss, val_dice, val_iou
 
 
-def plot_and_save_curves(history_df: pd.DataFrame, output_dir: str, prefix: str):
+def plot_and_save_curves(history_df: pd.DataFrame, output_dir: str, prefix: str, loss_label: str = "Loss"):
     """Generates and saves visual training curves."""
     try:
         import matplotlib
@@ -119,7 +118,7 @@ def plot_and_save_curves(history_df: pd.DataFrame, output_dir: str, prefix: str)
         plt.plot(epochs, history_df["val_loss"], label="Val Loss", color="#f97316", lw=2)
         plt.title(f"{prefix} - Training and Validation Loss Curve", fontsize=12, fontweight="bold")
         plt.xlabel("Epoch")
-        plt.ylabel("BCE + Dice Loss")
+        plt.ylabel(loss_label)
         plt.legend()
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.tight_layout()
@@ -159,6 +158,7 @@ def plot_and_save_curves(history_df: pd.DataFrame, output_dir: str, prefix: str)
 def run_training(
     dataset_name: str = "idrid",
     model_name: str = "unet",
+    loss_name: str = "auto",
     epochs: int = 15,
     batch_size: int = BATCH_SIZE,
     lr: float = LEARNING_RATE,
@@ -166,24 +166,23 @@ def run_training(
     output_dir: str = CHECKPOINT_DIR
 ):
     os.makedirs(output_dir, exist_ok=True)
-    
-    # Device resolution
+
     if device_str == "auto":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = torch.device(device_str)
-
-    print(f"=== Starting Training Session ===")
-    print(f"Dataset: {dataset_name.upper()} | Model: {model_name} | Device: {device} | Epochs: {epochs} | Batch: {batch_size}")
 
     is_drive = (dataset_name.lower() == "drive")
     if is_drive:
         from ai.datasets.drive_dataset import DRIVEDataset
         class_names = DRIVE_CLASSES
         n_classes = len(DRIVE_CLASSES)
-        train_ds = DRIVEDataset(split="train")
-        # Split train set 16 train / 4 val
-        val_ds = train_ds # evaluate on train subset
+        full_drive_ds = DRIVEDataset(split="train")
+        n_total = len(full_drive_ds)
+        n_val = max(1, int(round(0.2 * n_total)))
+        n_train = n_total - n_val
+        generator = torch.Generator().manual_seed(42)
+        train_ds, val_ds = random_split(full_drive_ds, [n_train, n_val], generator=generator)
     else:
         from ai.datasets.idrid_dataset import IDRiDDataset
         class_names = IDRID_CLASSES
@@ -204,9 +203,25 @@ def run_training(
 
     model = model.to(device)
 
-    criterion = BCEDiceLoss(bce_weight=0.5, dice_weight=0.5)
+    # Resolve Loss Function
+    if loss_name == "auto":
+        resolved_loss = "focal_dice" if (model_tag == "attention_unet" and not is_drive) else "bce_dice"
+    else:
+        resolved_loss = loss_name.lower()
+
+    if resolved_loss == "focal_dice":
+        criterion = ComboFocalDiceLoss(focal_weight=0.5, dice_weight=0.5, alpha=0.75, gamma=2.0)
+        loss_label = "Focal + Dice Loss"
+    else:
+        criterion = BCEDiceLoss(bce_weight=0.5, dice_weight=0.5)
+        loss_label = "BCE + Dice Loss"
+
+    print("=== Starting Training Session ===")
+    print(f"Dataset: {dataset_name.upper()} | Model: {model_tag} | Loss: {loss_label} | ImageSize: {IMAGE_SIZE} | Device: {device} | Epochs: {epochs} | Batch: {batch_size}")
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
+    scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda"))
     augmentor = RetinalAugmentor()
 
     prefix = f"{dataset_name.lower()}_{model_tag}"
@@ -215,7 +230,7 @@ def run_training(
 
     for epoch in range(1, epochs + 1):
         t0 = time.time()
-        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device, augmentor, is_drive)
+        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, criterion, device, augmentor, is_drive)
         val_loss, val_dice, val_iou = validate_epoch(model, val_loader, criterion, device, class_names, is_drive)
         elapsed = time.time() - t0
 
@@ -244,6 +259,8 @@ def run_training(
                 "best_val_dice": best_dice,
                 "dataset": dataset_name,
                 "model_name": model_tag,
+                "loss_name": resolved_loss,
+                "image_size": IMAGE_SIZE,
                 "n_classes": n_classes,
                 "class_names": class_names
             }, best_path)
@@ -256,6 +273,8 @@ def run_training(
         "model_state_dict": model.state_dict(),
         "dataset": dataset_name,
         "model_name": model_tag,
+        "loss_name": resolved_loss,
+        "image_size": IMAGE_SIZE,
         "n_classes": n_classes,
         "class_names": class_names
     }, last_path)
@@ -264,17 +283,19 @@ def run_training(
     df_hist = pd.DataFrame(history)
     csv_path = os.path.join(output_dir, f"{prefix}_training_history.csv")
     df_hist.to_csv(csv_path, index=False)
-    plot_and_save_curves(df_hist, output_dir, prefix)
+    plot_and_save_curves(df_hist, output_dir, prefix, loss_label=loss_label)
 
-    print(f"=== Training Completed ===")
+    print("=== Training Completed ===")
     print(f"Best Validation Dice: {best_dice:.4f}")
     print(f"History saved to {csv_path}")
     return df_hist, best_dice
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train U-Net / Attention U-Net on IDRiD or DRIVE")
     parser.add_argument("--dataset", type=str, default="idrid", choices=["idrid", "drive"])
     parser.add_argument("--model", type=str, default="unet", choices=["unet", "attention_unet"])
+    parser.add_argument("--loss", type=str, default="auto", choices=["auto", "bce_dice", "focal_dice"])
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--lr", type=float, default=LEARNING_RATE)
@@ -284,6 +305,7 @@ if __name__ == "__main__":
     run_training(
         dataset_name=args.dataset,
         model_name=args.model,
+        loss_name=args.loss,
         epochs=args.epochs,
         batch_size=args.batch_size,
         lr=args.lr,

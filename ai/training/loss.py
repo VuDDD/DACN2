@@ -59,4 +59,26 @@ class BCEDiceLoss(nn.Module):
 
         dice = self.dice_fn(logits, targets)
         return (self.bce_weight * bce) + (self.dice_weight * dice)
+class FocalLoss(nn.Module):
+    def __init__(self, alpha: float = 0.75, gamma: float = 2.0):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
 
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        bce = F.binary_cross_entropy_with_logits(logits, targets, reduction="none")
+        probs = torch.sigmoid(logits)
+        pt = targets * probs + (1.0 - targets) * (1.0 - probs)
+        alpha_t = targets * self.alpha + (1.0 - targets) * (1.0 - self.alpha)
+        return (alpha_t * ((1.0 - pt) ** self.gamma) * bce).mean()
+
+class ComboFocalDiceLoss(nn.Module):
+    def __init__(self, focal_weight: float = 0.5, dice_weight: float = 0.5, alpha: float = 0.75, gamma: float = 2.0):
+        super().__init__()
+        self.focal = FocalLoss(alpha=alpha, gamma=gamma)
+        self.dice = DiceLoss()
+        self.focal_weight = focal_weight
+        self.dice_weight = dice_weight
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        return self.focal_weight * self.focal(logits, targets) + self.dice_weight * self.dice(logits, targets)
