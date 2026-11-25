@@ -43,7 +43,9 @@ export const AnalysisStudio: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Report Generation
+  const [doctorNotes, setDoctorNotes] = useState<string>('');
   const [generatingReport, setGeneratingReport] = useState<boolean>(false);
+  const [exportingExcel, setExportingExcel] = useState<boolean>(false);
   const [reportUrl, setReportUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -199,20 +201,66 @@ export const AnalysisStudio: React.FC = () => {
     }, 1500);
   };
 
-  // Export PDF Report
+  const triggerBlobDownload = (blobData: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blobData);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Export PDF Report (UC-05)
   const handleExportPDF = async () => {
     if (!analysisId) return;
     setGeneratingReport(true);
     try {
+      const notes =
+        doctorNotes.trim() ||
+        'Hình ảnh tổn thương võng mạc và đĩa thị được định lượng tự động bằng mô hình Deep Learning.';
       const res = await api.post(`/reports/generate/${analysisId}`, {
-        doctor_notes: 'Hình ảnh tổn thương võng mạc và đĩa thị được định lượng tự động bằng mô hình Deep Learning.',
+        doctor_notes: notes,
       });
-      const downloadUrl = `/api/reports/${res.data.id}/download`;
-      window.open(downloadUrl, '_blank');
+      const pdfRes = await api.get(`/reports/${res.data.id}/download`, {
+        responseType: 'blob',
+      });
+      triggerBlobDownload(
+        new Blob([pdfRes.data], { type: 'application/pdf' }),
+        `${res.data.report_code}.pdf`
+      );
     } catch (err: any) {
       alert('Lỗi xuất báo cáo PDF: ' + (err.response?.data?.detail || err.message));
     } finally {
       setGeneratingReport(false);
+    }
+  };
+
+  // Export Excel Report
+  const handleExportExcel = async () => {
+    if (!analysisId) return;
+    setExportingExcel(true);
+    try {
+      const notes =
+        doctorNotes.trim() ||
+        'Hình ảnh tổn thương võng mạc và đĩa thị được định lượng tự động bằng mô hình Deep Learning.';
+      const res = await api.post(
+        `/reports/export-excel/${analysisId}`,
+        { doctor_notes: notes },
+        { responseType: 'blob' }
+      );
+      const reportCode = res.headers['x-report-code'] || `REP-${analysisId}`;
+      triggerBlobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `${reportCode}.xlsx`
+      );
+    } catch (err: any) {
+      alert('Lỗi xuất báo cáo Excel: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setExportingExcel(false);
     }
   };
 
@@ -228,15 +276,25 @@ export const AnalysisStudio: React.FC = () => {
             Môi trường tương tác đa lớp phân vùng tổn thương vi mô (IDRiD) và hệ thống mạch máu (DRIVE).
           </p>
         </div>
-        {analysisResult && (
-          <button
-            onClick={handleExportPDF}
-            disabled={generatingReport}
-            className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-emerald-600/20 transition disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            <span>{generatingReport ? 'Đang kết xuất PDF...' : 'Xuất Báo cáo Y khoa (PDF)'}</span>
-          </button>
+        {analysisResult && analysisResult.analysis_status === 'COMPLETED' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExportPDF}
+              disabled={generatingReport}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-emerald-600/20 transition disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              <span>{generatingReport ? 'Đang kết xuất PDF...' : 'Xuất báo cáo PDF'}</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              disabled={exportingExcel}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-sky-600/20 transition disabled:opacity-50"
+            >
+              <FileText className="w-4 h-4" />
+              <span>{exportingExcel ? 'Đang kết xuất Excel...' : 'Xuất Excel (.xlsx)'}</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -498,6 +556,22 @@ export const AnalysisStudio: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Doctor Clinical Notes (UC-05) */}
+              {analysisResult.analysis_status === 'COMPLETED' && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Ghi chú lâm sàng của bác sĩ (đưa vào báo cáo PDF & Excel):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={doctorNotes}
+                    onChange={(e) => setDoctorNotes(e.target.value)}
+                    placeholder="Ví dụ: Hẹn tái khám sau 3 tháng, kiểm soát HbA1c..."
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                  />
+                </div>
+              )}
 
               {/* Validation Metrics (If Ground Truth provided) */}
               {analysisResult.dice_score !== null && (
