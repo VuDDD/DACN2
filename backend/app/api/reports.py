@@ -13,9 +13,10 @@ from app.models.user import User
 from app.schemas.report import ReportOut
 from app.api.deps import get_current_user
 from app.services.pdf_generator import generate_medical_pdf_report
+from app.services.excel_generator import generate_medical_excel_report, generate_patients_summary_excel
 from app.storage.service import storage_service
 
-router = APIRouter(prefix="/reports", tags=["PDF Medical Reports"])
+router = APIRouter(prefix="/reports", tags=["PDF & Excel Medical Reports"])
 
 class GenerateReportRequest(BaseModel):
     doctor_notes: str = ""
@@ -108,5 +109,81 @@ def download_report(
         media_type="application/pdf",
         filename=f"{report.report_code}.pdf",
         headers={"Content-Disposition": f"attachment; filename={report.report_code}.pdf"}
+    )
+
+
+@router.post("/export-excel/{analysis_id}")
+def export_analysis_excel(
+    analysis_id: int,
+    body: GenerateReportRequest = GenerateReportRequest(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generates and downloads an Excel (.xlsx) clinical report for a completed analysis."""
+    analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+    if not analysis:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Analysis not found")
+
+    if analysis.analysis_status != AnalysisStatus.COMPLETED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot export Excel for analysis in status: {analysis.analysis_status}"
+        )
+
+    patient = db.query(Patient).filter(Patient.id == analysis.patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Associated patient not found")
+
+    report_code = f"REP-{analysis.id}-{uuid.uuid4().hex[:6].upper()}"
+    xlsx_filename = f"{report_code}.xlsx"
+    target_dir = os.path.join(storage_service.local_root, "reports")
+    os.makedirs(target_dir, exist_ok=True)
+    xlsx_abs_path = os.path.join(target_dir, xlsx_filename)
+
+    doctor_name = current_user.full_name or current_user.username
+    generate_medical_excel_report(
+        analysis=analysis,
+        patient=patient,
+        doctor_name=doctor_name,
+        output_xlsx_path=xlsx_abs_path,
+        doctor_notes=body.doctor_notes,
+    )
+
+    return FileResponse(
+        path=xlsx_abs_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=xlsx_filename,
+        headers={
+            "Content-Disposition": f"attachment; filename={xlsx_filename}",
+            "X-Report-Code": report_code,
+        }
+    )
+
+
+@router.get("/export-all-excel")
+def export_all_patients_excel(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Exports all patients, diagnostic analyses, and lesion details to a multi-sheet Excel file."""
+    patients = db.query(Patient).order_by(Patient.id.asc()).all()
+    analyses = db.query(Analysis).order_by(Analysis.created_at.desc()).all()
+
+    xlsx_filename = "RetinaAI_Patients_Diagnoses.xlsx"
+    target_dir = os.path.join(storage_service.local_root, "reports")
+    os.makedirs(target_dir, exist_ok=True)
+    xlsx_abs_path = os.path.join(target_dir, xlsx_filename)
+
+    generate_patients_summary_excel(
+        patients=patients,
+        analyses=analyses,
+        output_xlsx_path=xlsx_abs_path,
+    )
+
+    return FileResponse(
+        path=xlsx_abs_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=xlsx_filename,
+        headers={"Content-Disposition": f"attachment; filename={xlsx_filename}"}
     )
 

@@ -11,8 +11,58 @@ from reportlab.platypus import (
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 from app.core.config import settings
+
+
+def _register_unicode_fonts() -> tuple[str, str, str]:
+    """Register Unicode TTF fonts (supporting Vietnamese diacritics) with Helvetica fallback."""
+    font_candidates = [
+        # Windows Arial
+        (
+            r"C:\Windows\Fonts\arial.ttf",
+            r"C:\Windows\Fonts\arialbd.ttf",
+            r"C:\Windows\Fonts\ariali.ttf",
+            r"C:\Windows\Fonts\arialbi.ttf",
+            "ArialUnicode",
+        ),
+        # Linux DejaVuSans (Docker / Ubuntu)
+        (
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf",
+            "DejaVuSansUnicode",
+        ),
+    ]
+    for reg_path, bold_path, italic_path, bold_italic_path, prefix in font_candidates:
+        if os.path.exists(reg_path):
+            try:
+                reg_name = prefix
+                bold_name = f"{prefix}-Bold" if os.path.exists(bold_path) else prefix
+                italic_name = f"{prefix}-Italic" if os.path.exists(italic_path) else prefix
+                bi_name = f"{prefix}-BoldItalic" if os.path.exists(bold_italic_path) else bold_name
+                if reg_name not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont(reg_name, reg_path))
+                if bold_name != reg_name and bold_name not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont(bold_name, bold_path))
+                if italic_name != reg_name and italic_name not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont(italic_name, italic_path))
+                if bi_name not in pdfmetrics.getRegisteredFontNames():
+                    pdfmetrics.registerFont(TTFont(bi_name, bold_italic_path))
+                pdfmetrics.registerFontFamily(
+                    prefix,
+                    normal=reg_name,
+                    bold=bold_name,
+                    italic=italic_name,
+                    boldItalic=bi_name,
+                )
+                return reg_name, bold_name, italic_name
+            except Exception:
+                continue
+    return "Helvetica", "Helvetica-Bold", "Helvetica-Oblique"
 
 def generate_medical_pdf_report(
     analysis: Any,
@@ -39,6 +89,7 @@ def generate_medical_pdf_report(
     )
 
     styles = getSampleStyleSheet()
+    font_reg, font_bold, font_italic = _register_unicode_fonts()
 
     # Custom styles
     primary_color = colors.HexColor("#0284c7") # Medical Sky Blue
@@ -50,7 +101,7 @@ def generate_medical_pdf_report(
     title_style = ParagraphStyle(
         "HeaderTitle",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=16,
         leading=20,
         textColor=navy_color,
@@ -59,7 +110,7 @@ def generate_medical_pdf_report(
     subtitle_style = ParagraphStyle(
         "HeaderSubtitle",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=font_reg,
         fontSize=10,
         leading=14,
         textColor=primary_color,
@@ -68,7 +119,7 @@ def generate_medical_pdf_report(
     section_title_style = ParagraphStyle(
         "SectionTitle",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=12,
         leading=16,
         textColor=primary_color,
@@ -77,7 +128,7 @@ def generate_medical_pdf_report(
     body_style = ParagraphStyle(
         "BodyDark",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=font_reg,
         fontSize=9,
         leading=13,
         textColor=navy_color
@@ -85,7 +136,7 @@ def generate_medical_pdf_report(
     table_header_style = ParagraphStyle(
         "TableHeader",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=9,
         leading=12,
         textColor=colors.white,
@@ -94,7 +145,7 @@ def generate_medical_pdf_report(
     table_cell_style = ParagraphStyle(
         "TableCell",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=font_reg,
         fontSize=8.5,
         leading=11,
         textColor=navy_color,
@@ -103,7 +154,7 @@ def generate_medical_pdf_report(
     disclaimer_style = ParagraphStyle(
         "Disclaimer",
         parent=styles["Normal"],
-        fontName="Helvetica-Oblique",
+        fontName=font_italic,
         fontSize=7.5,
         leading=10,
         textColor=colors.HexColor("#64748b"),
@@ -219,22 +270,32 @@ def generate_medical_pdf_report(
         "VESSEL": ("Retinal Blood Vessels", "Full microvascular tree within valid Field of View (FOV)"),
     }
 
-    retinal_fov_px = getattr(analysis, "retinal_fov_pixels", 0) or 0
+    def _safe_int(val: Any, default: int = 0) -> int:
+        if val is None:
+            return default
+        if isinstance(val, (bytes, bytearray)):
+            return int.from_bytes(val, byteorder="little", signed=True)
+        return int(val)
+
+    retinal_fov_px = _safe_int(getattr(analysis, "retinal_fov_pixels", 0))
     details = getattr(analysis, "lesion_details", [])
     if details:
         for d in details:
+            d_cnt = _safe_int(d.count)
+            d_area = _safe_int(d.area_pixels)
+            d_pct = float(d.area_percentage or 0.0)
             info = lesion_names_map.get(d.lesion_type, (d.lesion_type, "Abnormal retinal manifestation"))
             if retinal_fov_px > 0:
-                area_mm2 = (d.area_pixels / retinal_fov_px) * 1090.0
+                area_mm2 = (d_area / retinal_fov_px) * 1090.0
             else:
-                area_mm2 = (d.area_percentage / 100.0) * 1090.0
+                area_mm2 = (d_pct / 100.0) * 1090.0
 
             row = [
                 Paragraph(f"<b>{info[0]}</b>", table_cell_style),
-                Paragraph(str(d.count), table_cell_style),
-                Paragraph(f"{d.area_pixels:,} px", table_cell_style),
+                Paragraph(str(d_cnt), table_cell_style),
+                Paragraph(f"{d_area:,} px", table_cell_style),
                 Paragraph(f"{area_mm2:.3f} mm²", table_cell_style),
-                Paragraph(f"{d.area_percentage:.3f} %", table_cell_style),
+                Paragraph(f"{d_pct:.3f} %", table_cell_style),
                 Paragraph(f"<font size='7.5'>{info[1]}</font>", table_cell_style),
             ]
             lesion_rows.append(row)
@@ -276,9 +337,9 @@ def generate_medical_pdf_report(
         for d in details:
             lesion_dicts.append({
                 "lesion_type": d.lesion_type,
-                "count": d.count,
-                "area_pixels": d.area_pixels,
-                "area_percentage": d.area_percentage
+                "count": _safe_int(d.count),
+                "area_pixels": _safe_int(d.area_pixels),
+                "area_percentage": float(d.area_percentage or 0.0)
             })
     total_pct_val = float(getattr(analysis, "lesion_percentage", 0.0) or 0.0)
     npdr_info = classify_npdr_severity(lesion_dicts, total_pct_val)

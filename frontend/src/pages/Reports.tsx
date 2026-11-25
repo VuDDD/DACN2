@@ -32,26 +32,87 @@ export const Reports: React.FC = () => {
     }
   };
 
+  const triggerBlobDownload = (blobData: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blobData);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleDownloadPDF = async (analysisId: number) => {
     try {
       const res = await api.post(`/reports/generate/${analysisId}`, {
         doctor_notes: 'Báo cáo định lượng phân vùng tổn thương võng mạc xuất bản tự động.',
       });
-      window.open(`/api/reports/${res.data.id}/download`, '_blank');
+      const pdfRes = await api.get(`/reports/${res.data.id}/download`, {
+        responseType: 'blob',
+      });
+      triggerBlobDownload(
+        new Blob([pdfRes.data], { type: 'application/pdf' }),
+        `${res.data.report_code}.pdf`
+      );
     } catch (err: any) {
-      alert('Lỗi tải báo cáo: ' + (err.response?.data?.detail || err.message));
+      alert('Lỗi tải báo cáo PDF: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleDownloadExcel = async (analysisId: number) => {
+    try {
+      const res = await api.post(
+        `/reports/export-excel/${analysisId}`,
+        { doctor_notes: 'Báo cáo định lượng phân vùng tổn thương võng mạc xuất bản tự động.' },
+        { responseType: 'blob' }
+      );
+      const reportCode = res.headers['x-report-code'] || `REP-${analysisId}`;
+      triggerBlobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `${reportCode}.xlsx`
+      );
+    } catch (err: any) {
+      alert('Lỗi tải báo cáo Excel: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleExportAllExcel = async () => {
+    try {
+      const res = await api.get('/reports/export-all-excel', {
+        responseType: 'blob',
+      });
+      triggerBlobDownload(
+        new Blob([res.data], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        'RetinaAI_Patients_Diagnoses.xlsx'
+      );
+    } catch (err: any) {
+      alert('Lỗi xuất tổng hợp Excel: ' + (err.response?.data?.detail || err.message));
     }
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Hồ sơ Lâm sàng & Báo cáo Xét nghiệm (Medical Reports)
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Lịch sử kết quả định lượng tổn thương và các phiếu kết quả dạng PDF tiêu chuẩn y khoa.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Hồ sơ Lâm sàng & Báo cáo Xét nghiệm (Medical Reports)
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Lịch sử kết quả định lượng tổn thương và các phiếu kết quả dạng PDF / Excel tiêu chuẩn y khoa.
+          </p>
+        </div>
+        <button
+          onClick={handleExportAllExcel}
+          className="inline-flex items-center space-x-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-sky-600/20 transition"
+        >
+          <FileText className="w-4 h-4" />
+          <span>Xuất toàn bộ ra Excel (.xlsx)</span>
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -122,13 +183,22 @@ export const Reports: React.FC = () => {
                           <Eye className="w-4 h-4" />
                         </Link>
                         {a.analysis_status === 'COMPLETED' && (
-                          <button
-                            onClick={() => handleDownloadPDF(a.id)}
-                            title="Tải báo cáo y khoa PDF"
-                            className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 hover:text-emerald-800 transition"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleDownloadPDF(a.id)}
+                              title="Tải báo cáo y khoa PDF"
+                              className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 hover:text-emerald-800 transition"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadExcel(a.id)}
+                              title="Tải báo cáo Excel (.xlsx)"
+                              className="p-1.5 rounded hover:bg-sky-50 text-sky-600 hover:text-sky-800 transition"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

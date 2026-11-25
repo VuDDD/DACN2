@@ -20,7 +20,7 @@ from app.api.patients import create_patient, list_patients, get_patient, update_
 from app.api.images import list_sample_images, load_sample_into_storage
 from app.api.dashboard import get_dashboard_statistics, get_lesion_distribution, get_model_performance
 from app.api.analysis import trigger_prediction, get_analysis_details, get_analysis_status, PredictRequest
-from app.api.reports import create_report, GenerateReportRequest
+from app.api.reports import create_report, export_analysis_excel, export_all_patients_excel, GenerateReportRequest
 
 @pytest.fixture(scope="module")
 def db_session():
@@ -157,3 +157,18 @@ def test_report_generation(db_session, admin_user):
     abs_pdf = storage_service.get_absolute_path(rep_out.pdf_path)
     assert os.path.exists(abs_pdf), f"PDF report file must be written to disk at {abs_pdf}"
     assert os.path.getsize(abs_pdf) > 1000, "PDF report must have non-trivial file size"
+
+    # Generate single-analysis Excel report
+    xlsx_resp = export_analysis_excel(
+        analysis_id=analysis.id,
+        body=GenerateReportRequest(doctor_notes="Hẹn tái khám sau 3 tháng, kiểm soát HbA1c."),
+        db=db_session,
+        current_user=admin_user,
+    )
+    assert os.path.exists(xlsx_resp.path), f"Excel report file must exist at {xlsx_resp.path}"
+    assert os.path.getsize(xlsx_resp.path) > 2000, "Excel report must have non-trivial file size"
+
+    # Generate full patients & diagnoses Excel workbook
+    all_xlsx_resp = export_all_patients_excel(db=db_session, current_user=admin_user)
+    assert os.path.exists(all_xlsx_resp.path), f"All-patients Excel file must exist at {all_xlsx_resp.path}"
+    assert os.path.getsize(all_xlsx_resp.path) > 2000, "All-patients Excel file must have non-trivial file size"
