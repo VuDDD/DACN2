@@ -55,6 +55,14 @@ class Analysis(Base):
     lesion_details = relationship("LesionDetail", back_populates="analysis", cascade="all, delete-orphan")
     reports = relationship("Report", back_populates="analysis", cascade="all, delete-orphan")
 
+    @property
+    def patient_code(self) -> str | None:
+        return self.patient.patient_code if self.patient else None
+
+    @property
+    def patient_name(self) -> str | None:
+        return self.patient.full_name if self.patient else None
+
 
 class LesionDetail(Base):
     __tablename__ = "lesion_details"

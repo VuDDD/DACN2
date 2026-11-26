@@ -2,7 +2,7 @@ import os
 import csv
 from typing import Any, List, Dict
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 
 from app.database.session import get_db
@@ -64,7 +64,7 @@ def get_recent_analyses(
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """Retrieve most recent analyses for the activity feed."""
-    analyses = db.query(Analysis).order_by(desc(Analysis.created_at)).limit(limit).all()
+    analyses = db.query(Analysis).options(joinedload(Analysis.patient)).order_by(desc(Analysis.created_at)).limit(limit).all()
     return analyses
 
 @router.get("/lesion-distribution", response_model=List[LesionDistributionStat])

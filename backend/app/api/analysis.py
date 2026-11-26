@@ -3,7 +3,7 @@ import time
 import logging
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from pydantic import BaseModel
 
@@ -99,12 +99,12 @@ def trigger_prediction(
 def list_analyses(
     patient_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """List historical analyses with optional patient filter."""
-    query = db.query(Analysis)
+    query = db.query(Analysis).options(joinedload(Analysis.patient))
     if patient_id is not None:
         query = query.filter(Analysis.patient_id == patient_id)
     

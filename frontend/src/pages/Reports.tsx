@@ -10,11 +10,14 @@ import {
   Activity,
   CheckCircle2,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Search
 } from 'lucide-react';
 
 export const Reports: React.FC = () => {
   const [analyses, setAnalyses] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -22,11 +25,16 @@ export const Reports: React.FC = () => {
   }, []);
 
   const fetchAnalyses = async () => {
+    setErrorMsg(null);
     try {
-      const res = await api.get('/analysis?limit=50');
-      setAnalyses(res.data.items);
-    } catch (e) {
+      const res = await api.get('/analysis?limit=100');
+      setAnalyses(res.data.items || []);
+    } catch (e: any) {
       console.error('Error fetching analyses:', e);
+      setErrorMsg(
+        e.response?.data?.detail ||
+          'Không tải được danh sách hồ sơ bệnh nhân từ máy chủ Backend.'
+      );
     } finally {
       setLoading(false);
     }
@@ -95,6 +103,18 @@ export const Reports: React.FC = () => {
     }
   };
 
+  const filteredAnalyses = analyses.filter((a) => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.trim().toLowerCase();
+    return (
+      String(a.id).includes(q) ||
+      (a.patient_code || '').toLowerCase().includes(q) ||
+      (a.patient_name || '').toLowerCase().includes(q) ||
+      (a.task_type || '').toLowerCase().includes(q) ||
+      (a.model_name || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -103,17 +123,36 @@ export const Reports: React.FC = () => {
             Hồ sơ Lâm sàng & Báo cáo Xét nghiệm (Medical Reports)
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Lịch sử kết quả định lượng tổn thương và các phiếu kết quả dạng PDF / Excel tiêu chuẩn y khoa.
+            Danh sách bệnh nhân kèm lịch sử kết quả định lượng tổn thương và phiếu kết quả PDF / Excel.
           </p>
         </div>
-        <button
-          onClick={handleExportAllExcel}
-          className="inline-flex items-center space-x-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-sky-600/20 transition"
-        >
-          <FileText className="w-4 h-4" />
-          <span>Xuất toàn bộ ra Excel (.xlsx)</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm tên, mã BN hoặc mã XN..."
+              className="pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none w-56"
+            />
+          </div>
+          <button
+            onClick={handleExportAllExcel}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-sky-600/20 transition"
+          >
+            <FileText className="w-4 h-4" />
+            <span>Xuất toàn bộ ra Excel (.xlsx)</span>
+          </button>
+        </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -121,6 +160,7 @@ export const Reports: React.FC = () => {
             <thead className="bg-slate-50 text-slate-500 uppercase border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4 font-semibold">Mã xét nghiệm</th>
+                <th className="py-3 px-4 font-semibold">Bệnh nhân</th>
                 <th className="py-3 px-4 font-semibold">Nhiệm vụ</th>
                 <th className="py-3 px-4 font-semibold">Mô hình AI</th>
                 <th className="py-3 px-4 font-semibold text-center">Trạng thái</th>
@@ -132,21 +172,29 @@ export const Reports: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     Đang tải danh sách hồ sơ phân tích...
                   </td>
                 </tr>
-              ) : analyses.length === 0 ? (
+              ) : filteredAnalyses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    Chưa có hồ sơ xét nghiệm nào trong hệ thống.
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    Chưa có hồ sơ xét nghiệm nào phù hợp trong hệ thống.
                   </td>
                 </tr>
               ) : (
-                analyses.map((a) => (
+                filteredAnalyses.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50/80 transition">
                     <td className="py-3 px-4 font-mono font-bold text-sky-700">
                       #{a.id}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-semibold text-slate-800">
+                        {a.patient_name || `Bệnh nhân #${a.patient_id}`}
+                      </div>
+                      <div className="text-[10px] font-mono text-slate-500">
+                        {a.patient_code || `ID-${a.patient_id}`}
+                      </div>
                     </td>
                     <td className="py-3 px-4 font-medium text-slate-800">
                       {a.task_type === 'IDRID_LESIONS' ? 'Tổn thương võng mạc (IDRiD)' : 'Cây mạch máu (DRIVE)'}

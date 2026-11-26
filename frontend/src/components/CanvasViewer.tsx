@@ -38,6 +38,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   const origImgRef = useRef<HTMLImageElement | null>(null);
   const predImgRef = useRef<HTMLImageElement | null>(null);
   const gtImgRef = useRef<HTMLImageElement | null>(null);
+  const filteredPredCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Pan & Zoom Transform State
   const [scale, setScale] = useState<number>(1);
@@ -71,6 +72,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       img.src = originalImageUrl;
       img.onload = () => {
         origImgRef.current = img;
+        rebuildFilteredOverlay();
         resetView();
       };
     }
@@ -81,10 +83,12 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       img.src = predictedMaskUrl;
       img.onload = () => {
         predImgRef.current = img;
+        rebuildFilteredOverlay();
         draw();
       };
     } else {
       predImgRef.current = null;
+      filteredPredCanvasRef.current = null;
     }
 
     if (groundTruthUrl) {
@@ -99,6 +103,90 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       gtImgRef.current = null;
     }
   }, [originalImageUrl, predictedMaskUrl, groundTruthUrl]);
+
+  // Rebuild offscreen filtered overlay whenever layer toggles change
+  const rebuildFilteredOverlay = useCallback(() => {
+    const orig = origImgRef.current;
+    const pred = predImgRef.current;
+    if (!orig || !orig.complete || !pred || !pred.complete) {
+      filteredPredCanvasRef.current = null;
+      return;
+    }
+
+    const allEnabled = classes.every((c) => c.enabled);
+    if (allEnabled) {
+      filteredPredCanvasRef.current = null;
+      return;
+    }
+
+    const w = pred.naturalWidth;
+    const h = pred.naturalHeight;
+    if (!w || !h) return;
+
+    const predCanvas = document.createElement('canvas');
+    predCanvas.width = w;
+    predCanvas.height = h;
+    const predCtx = predCanvas.getContext('2d');
+
+    const origCanvas = document.createElement('canvas');
+    origCanvas.width = w;
+    origCanvas.height = h;
+    const origCtx = origCanvas.getContext('2d');
+
+    if (!predCtx || !origCtx) return;
+    predCtx.drawImage(pred, 0, 0, w, h);
+    origCtx.drawImage(orig, 0, 0, w, h);
+
+    const predData = predCtx.getImageData(0, 0, w, h);
+    const origData = origCtx.getImageData(0, 0, w, h);
+    const p = predData.data;
+    const o = origData.data;
+
+    const classPalette: Array<{ key: string; rgb: [number, number, number]; enabled: boolean }> = [
+      { key: 'MA', rgb: [239, 68, 68], enabled: classes.find((c) => c.key === 'MA')?.enabled ?? true },
+      { key: 'HE', rgb: [249, 115, 22], enabled: classes.find((c) => c.key === 'HE')?.enabled ?? true },
+      { key: 'EX', rgb: [234, 179, 8], enabled: classes.find((c) => c.key === 'EX')?.enabled ?? true },
+      { key: 'SE', rgb: [34, 197, 94], enabled: classes.find((c) => c.key === 'SE')?.enabled ?? true },
+      { key: 'OD', rgb: [59, 130, 246], enabled: classes.find((c) => c.key === 'OD')?.enabled ?? true },
+      { key: 'VESSEL', rgb: [168, 85, 247], enabled: classes.find((c) => c.key === 'VESSEL')?.enabled ?? true },
+    ];
+
+    const alphaEst = 0.45;
+    for (let idx = 0; idx < p.length; idx += 4) {
+      const diff = Math.abs(p[idx] - o[idx]) + Math.abs(p[idx + 1] - o[idx + 1]) + Math.abs(p[idx + 2] - o[idx + 2]);
+      if (diff <= 18) continue;
+
+      const er = Math.min(255, Math.max(0, o[idx] + (p[idx] - o[idx]) / alphaEst));
+      const eg = Math.min(255, Math.max(0, o[idx + 1] + (p[idx + 1] - o[idx + 1]) / alphaEst));
+      const eb = Math.min(255, Math.max(0, o[idx + 2] + (p[idx + 2] - o[idx + 2]) / alphaEst));
+
+      let bestDist = Infinity;
+      let bestEnabled = true;
+      for (const item of classPalette) {
+        const dr = er - item.rgb[0];
+        const dg = eg - item.rgb[1];
+        const db = eb - item.rgb[2];
+        const dist = dr * dr + dg * dg + db * db;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestEnabled = item.enabled;
+        }
+      }
+
+      if (!bestEnabled) {
+        p[idx] = o[idx];
+        p[idx + 1] = o[idx + 1];
+        p[idx + 2] = o[idx + 2];
+      }
+    }
+
+    predCtx.putImageData(predData, 0, 0);
+    filteredPredCanvasRef.current = predCanvas;
+  }, [classes]);
+
+  useEffect(() => {
+    rebuildFilteredOverlay();
+  }, [rebuildFilteredOverlay]);
 
   const resetView = useCallback(() => {
     if (!canvasRef.current || !origImgRef.current) return;
@@ -138,14 +226,16 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
 
     const imgW = orig.naturalWidth;
     const imgH = orig.naturalHeight;
+    const allLayersEnabled = classes.every((c) => c.enabled);
+    const predSource = !allLayersEnabled && filteredPredCanvasRef.current ? filteredPredCanvasRef.current : predImgRef.current;
 
     if (viewMode === 'original') {
       ctx.drawImage(orig, 0, 0);
-    } else if (viewMode === 'prediction' && predImgRef.current) {
-      ctx.drawImage(predImgRef.current, 0, 0, imgW, imgH);
+    } else if (viewMode === 'prediction' && predSource) {
+      ctx.drawImage(predSource, 0, 0, imgW, imgH);
     } else if (viewMode === 'groundtruth' && gtImgRef.current) {
       ctx.drawImage(gtImgRef.current, 0, 0, imgW, imgH);
-    } else if (viewMode === 'split' && predImgRef.current) {
+    } else if (viewMode === 'split' && predSource) {
       // Split view: Left original, Right prediction
       const splitX = (imgW * splitPosition) / 100;
       
@@ -162,7 +252,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       ctx.beginPath();
       ctx.rect(splitX, 0, imgW - splitX, imgH);
       ctx.clip();
-      ctx.drawImage(predImgRef.current, 0, 0, imgW, imgH);
+      ctx.drawImage(predSource, 0, 0, imgW, imgH);
       ctx.restore();
 
       // Draw split divider line
@@ -176,16 +266,16 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       // Blend Mode (Original + translucent prediction overlay)
       ctx.drawImage(orig, 0, 0);
 
-      if (predImgRef.current && opacity > 0) {
+      if (predSource && opacity > 0) {
         ctx.save();
         ctx.globalAlpha = opacity;
-        ctx.drawImage(predImgRef.current, 0, 0, imgW, imgH);
+        ctx.drawImage(predSource, 0, 0, imgW, imgH);
         ctx.restore();
       }
     }
 
     ctx.restore();
-  }, [offset, scale, viewMode, opacity, splitPosition]);
+  }, [offset, scale, viewMode, opacity, splitPosition, classes]);
 
   useEffect(() => {
     draw();

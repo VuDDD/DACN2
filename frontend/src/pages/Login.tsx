@@ -42,9 +42,18 @@ export const Login: React.FC = () => {
         navigate('/');
       }
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.'
-      );
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setError(detail.map((d: any) => d?.msg || JSON.stringify(d)).join('; '));
+      } else if (typeof detail === 'string' && detail.trim()) {
+        setError(detail);
+      } else if (!err.response || err.response.status >= 502) {
+        setError(
+          'Không kết nối được tới Backend (127.0.0.1:8000). Vui lòng khởi chạy server Backend trước.'
+        );
+      } else {
+        setError('Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
+      }
     } finally {
       setLoading(false);
     }
