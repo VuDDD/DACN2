@@ -3,6 +3,10 @@ from typing import List, Union
 from pydantic_settings import BaseSettings
 from pydantic import AnyHttpUrl, validator
 
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DEFAULT_SQLITE_PATH = os.path.join(BACKEND_DIR, "retina_medical.db").replace("\\", "/")
+DEFAULT_STORAGE_DIR = os.path.join(BACKEND_DIR, "backend_storage")
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Retina Medical AI Platform"
     PROJECT_DESCRIPTION: str = "Nền tảng phân vùng và định lượng tổn thương y khoa tự động ứng dụng Deep Learning"
@@ -15,10 +19,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
     
     # Database
-    # Defaults to SQLite for local standalone development, switches to PostgreSQL via env var
+    # Defaults to SQLite inside backend/ regardless of CWD, switches to PostgreSQL via env var
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "sqlite:///./retina_medical.db"
+        f"sqlite:///{DEFAULT_SQLITE_PATH}"
     )
     
     # Redis / Celery
@@ -34,7 +38,7 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() in ("true", "1")
     
     # Local Storage fallback (used when MinIO service is offline or in local dev)
-    STORAGE_DIR: str = os.getenv("STORAGE_DIR", "./backend_storage")
+    STORAGE_DIR: str = os.getenv("STORAGE_DIR", DEFAULT_STORAGE_DIR)
     
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = [
